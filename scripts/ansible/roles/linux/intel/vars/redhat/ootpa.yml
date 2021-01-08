@@ -20,3 +20,4 @@ intel_dcap_packages:
   - "libsgx-dcap-ql"
   - "libsgx-dcap-ql-devel"
   - "libsgx-urts"
+  - "libsgx-quote-ex"

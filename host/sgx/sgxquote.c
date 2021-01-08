@@ -100,8 +100,17 @@ static quote3_error_t (*_sgx_qv_verify_quote)(
 
 #define UNLOAD_SGX_DCAP_LIB(module) FreeLibrary((HANDLE)module)
 
+// Before: the in-process call path is used unless the environment variable
+// SGX_AESM_ADDR is set. After: Regardless of the existence and value of
+// SGX_AESM_ADDR, out-of-process call path is the default setting.
 #define SGX_DCAP_IN_PROCESS_QUOTING() \
     (GetEnvironmentVariableA("SGX_AESM_ADDR", NULL, 0) == 0)
+
+// Before: this macro does not exist.
+// After: Out-of-process call path is the default setting unless the user
+// demands in-process call path be used.
+#define SGX_USE_IN_PROCESS_QUOTING() \
+    (GetEnvironmentVariableA("SGX_USE_IN_PROCESS_QUOTING", NULL, 0) != 0)
 
 #define TRY_TO_USE_SGX_DCAP_QVL() \
     (GetEnvironmentVariableA("USE_SGX_QVL", NULL, 0) != 0)
@@ -123,7 +132,16 @@ static quote3_error_t (*_sgx_qv_verify_quote)(
 
 #define UNLOAD_SGX_DCAP_LIB(module) dlclose(module)
 
+// Before: the in-process call path is used unless the environment variable
+// SGX_AESM_ADDR is set. After: Regardless of the existence and value of
+// SGX_AESM_ADDR, out-of-process call path is the default setting.
 #define SGX_DCAP_IN_PROCESS_QUOTING() (getenv("SGX_AESM_ADDR") == NULL)
+
+// Before: this macro does not exist.
+// After: Out-of-process call path is the default setting unless the user
+// demands in-process call path be used.
+#define SGX_USE_IN_PROCESS_QUOTING() \
+    (getenv("SGX_USE_IN_PROCESS_QUOTING") != NULL)
 
 #define TRY_TO_USE_SGX_DCAP_QVL() (getenv("USE_SGX_QVL") != NULL)
 
@@ -262,7 +280,7 @@ static void _load_quote_ex_library_once(void)
 
     // First test if DCAP in-process quoting is requested.
     // If not, there is no need to load DCAP without using it.
-    if (SGX_DCAP_IN_PROCESS_QUOTING() && _load_sgx_dcap_ql())
+    if (SGX_USE_IN_PROCESS_QUOTING() && _load_sgx_dcap_ql())
     {
         OE_TRACE_INFO("DCAP installed and set for in-process quoting.");
         _quote_ex_library.use_dcap_library_instead = true;
