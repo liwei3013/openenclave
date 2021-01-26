@@ -280,7 +280,11 @@ static void _load_quote_ex_library_once(void)
 
     // First test if DCAP in-process quoting is requested.
     // If not, there is no need to load DCAP without using it.
+#ifdef _WIN32
+    if (SGX_DCAP_IN_PROCESS_QUOTING() && _load_sgx_dcap_ql())
+#else
     if (SGX_USE_IN_PROCESS_QUOTING() && _load_sgx_dcap_ql())
+#endif
     {
         OE_TRACE_INFO("DCAP installed and set for in-process quoting.");
         _quote_ex_library.use_dcap_library_instead = true;
