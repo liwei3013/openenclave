@@ -14,6 +14,10 @@ intel_dcap_packages:
   - "libsgx-dcap-ql"
   - "libsgx-dcap-ql-dev"
   - "libsgx-urts"
+  - "libsgx-aesm-ecdsa-plugin"
+  - "libsgx-aesm-pce-plugin"
+  - "libsgx-aesm-quote-ex-plugin"
+  - "libsgx-aesm-service"
   - "libsgx-quote-ex"
 
 packages_validation_distribution_files:
