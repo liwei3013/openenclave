@@ -248,12 +248,14 @@ static bool _load_sgx_dcap_qvl(void)
     return (_qvl_module != NULL);
 }
 
-static bool _use_in_process_quoting(void)
+static bool _sgx_use_in_process_quoting()
 {
     // Before: the in-process call path is used unless the environment variable
-    // SGX_AESM_ADDR is set. After: Out-of-process call path is the default
-    // setting for Linux, while in-process call path is the default setting for
-    // Windows.
+    // SGX_AESM_ADDR is set. Now: the environment variable SGX_AESM_ADDR is
+    // deprecated. In-process and out-of-process call paths are the default
+    // settings for Windows and Linux, respectively, unless the user demands
+    // in-process call path be used by setting the environment variable
+    // SGX_USE_IN_PROCESS_QUOTING to 1.
     static char* sgx_use_in_process_quoting;
 #ifdef _WIN32
     GetEnvironmentVariableA(
@@ -288,7 +290,7 @@ static void _load_quote_ex_library_once(void)
 
     // First test if DCAP in-process quoting is requested.
     // If not, there is no need to load DCAP without using it.
-    if (_use_in_process_quoting() && _load_sgx_dcap_ql())
+    if (_sgx_use_in_process_quoting() && _load_sgx_dcap_ql())
     {
         OE_TRACE_INFO("DCAP installed and set for in-process quoting.");
         _quote_ex_library.use_dcap_library_instead = true;
