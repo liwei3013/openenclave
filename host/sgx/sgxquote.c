@@ -17,6 +17,7 @@
 #include <string.h>
 #include "../../common/oe_host_stdlib.h"
 #include "../../common/sgx/endorsements.h"
+#include "../dupenv.h"
 #include "../hostthread.h"
 #include "sgxquote_ex.h"
 
@@ -252,33 +253,32 @@ static bool _sgx_use_in_process_quoting()
 {
     // Before: the in-process call path is used unless the environment variable
     // SGX_AESM_ADDR is set. Now: the environment variable SGX_AESM_ADDR is
-    // deprecated. In-process and out-of-process call paths are the default
-    // settings for Windows and Linux, respectively, unless the user demands
-    // in-process call path be used by setting the environment variable
-    // SGX_USE_IN_PROCESS_QUOTING to 1.
-    static char* sgx_use_in_process_quoting;
+    // deprecated. Out-of-process call path will be default on Linux as an SGX
+    // kernel patch upstreaming is scheduled in February or March 2021. Since
+    // the situation is not urgent on Windows, in-process call path will remain
+    // default on Windows.
+    bool result;
+    char* sgx_use_in_process_quoting = oe_dupenv("SGX_USE_IN_PROCESS_QUOTING");
+
+    if (sgx_use_in_process_quoting &&
+        strcmp(sgx_use_in_process_quoting, "0") == 0)
+        result = false;
+    else if (
+        sgx_use_in_process_quoting &&
+        strcmp(sgx_use_in_process_quoting, "1") == 0)
+        result = true;
+    else
+    {
 #ifdef _WIN32
-    GetEnvironmentVariableA(
-        "SGX_USE_IN_PROCESS_QUOTING", sgx_use_in_process_quoting, 0);
-    if (sgx_use_in_process_quoting == NULL)
-        return true;
-    else if (strcmp(sgx_use_in_process_quoting, "0") == 0)
-        return false;
-    else if (strcmp(sgx_use_in_process_quoting, "1") == 0)
-        return true;
-    else
-        return true;
+        result = true;
 #else
-    sgx_use_in_process_quoting = getenv("SGX_USE_IN_PROCESS_QUOTING");
-    if (sgx_use_in_process_quoting == NULL)
-        return false;
-    else if (strcmp(sgx_use_in_process_quoting, "0") == 0)
-        return false;
-    else if (strcmp(sgx_use_in_process_quoting, "1") == 0)
-        return true;
-    else
-        return false;
+        result = false;
 #endif
+    }
+
+    if (sgx_use_in_process_quoting)
+        oe_free(sgx_use_in_process_quoting);
+    return result;
 }
 
 static void _load_quote_ex_library_once(void)
