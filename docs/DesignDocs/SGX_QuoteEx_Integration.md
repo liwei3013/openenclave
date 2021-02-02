@@ -141,6 +141,10 @@ on the same platform.
     - If `SGX_AESM_ADDR` is defined (regardless of its value), out-of-process
     quote generation is done.
     - Otherwise if it is not defined, in-process quote generation is done.
+  - Since v0.15, another environment variable, `SGX_USE_IN_PROCESS_QUOTING`, controls the selection instead.
+    - If the value of `SGX_USE_IN_PROCESS_QUOTING` is set to 0, out-of-process quote generation is done.
+    - If the value of `SGX_USE_IN_PROCESS_QUOTING` is set to 1, in-process quote generation is done.
+    - If `SGX_USE_IN_PROCESS_QUOTING` is not defined, or the value of `SGX_USE_IN_PROCESS_QUOTING` is set to neither 0 nor 1, then out-of-process quote generation is done on Linux, while in-process quote generation is done on Windows by default.
   - On Linux platforms, access control for quote generation is enforced by
   the SGX Linux driver.
     - Every process that hosts a Quoting

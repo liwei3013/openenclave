@@ -21,6 +21,8 @@
 #include "../hostthread.h"
 #include "sgxquote_ex.h"
 
+static bool defined_sgx_use_in_process_quoting = false;
+
 // Check consistency with OE definition.
 OE_STATIC_ASSERT(sizeof(sgx_target_info_t) == 512);
 OE_STATIC_ASSERT(sizeof(sgx_report_t) == 432);
@@ -262,11 +264,17 @@ static bool _sgx_use_in_process_quoting()
 
     if (sgx_use_in_process_quoting &&
         strcmp(sgx_use_in_process_quoting, "0") == 0)
+    {
+        defined_sgx_use_in_process_quoting = true;
         result = false;
+    }
     else if (
         sgx_use_in_process_quoting &&
         strcmp(sgx_use_in_process_quoting, "1") == 0)
+    {
+        defined_sgx_use_in_process_quoting = true;
         result = true;
+    }
     else
     {
 #ifdef _WIN32
@@ -316,12 +324,24 @@ static void _load_quote_ex_library_once(void)
             _quote_ex_library.sgx_get_supported_att_key_id_num(&att_key_id_num);
         if (status != SGX_SUCCESS || att_key_id_num == 0)
         {
-            OE_TRACE_ERROR(
-                "_load_quote_ex_library_once() "
-                "sgx_get_supported_att_key_id_num() status=%d num=%d\n",
-                status,
-                att_key_id_num);
-            OE_RAISE(OE_QUOTE_PROVIDER_CALL_ERROR);
+            if (defined_sgx_use_in_process_quoting)
+            {
+                // raise the error as the user intends to use quote-ex library,
+                // which turns out to be unavailable
+                OE_TRACE_ERROR(
+                    "_load_quote_ex_library_once() "
+                    "sgx_get_supported_att_key_id_num() status=%d num=%d\n",
+                    status,
+                    att_key_id_num);
+                OE_RAISE(OE_QUOTE_PROVIDER_CALL_ERROR);
+            }
+            else
+            {
+                // try using dcap instead
+                OE_TRACE_INFO("Try using in-process quoting.");
+                _quote_ex_library.use_dcap_library_instead = true;
+                return;
+            }
         }
 
         local_mapped = (bool*)oe_malloc(att_key_id_num * sizeof(bool));
