@@ -26,9 +26,7 @@ typedef struct _oe_sgx_enclave_image_info_t
 } oe_sgx_enclave_image_info_t;
 
 /* Max number of threads in an enclave supported */
-#ifndef OE_SGX_MAX_TCS
-#define OE_SGX_MAX_TCS 32
-#endif
+#define OE_SGX_MAX_TCS 1024
 
 // oe_sgx_enclave_properties_t SGX enclave properties derived type
 #define OE_SGX_FLAGS_DEBUG 0x0000000000000002ULL
