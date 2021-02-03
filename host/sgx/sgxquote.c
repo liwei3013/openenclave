@@ -277,6 +277,9 @@ static bool _sgx_use_in_process_quoting()
     }
     else
     {
+        // this includes both the case where the environment variable
+        // SGX_USE_IN_PROCESS_QUOTING is undefined and the case where it is set
+        // to a value other than 0 or 1.
 #ifdef _WIN32
         result = true;
 #else
@@ -338,9 +341,9 @@ static void _load_quote_ex_library_once(void)
             else
             {
                 // try using dcap instead
-                OE_TRACE_INFO("Try using in-process quoting.");
-                _quote_ex_library.use_dcap_library_instead = true;
-                return;
+                OE_TRACE_INFO("Out-of-process quoting is not specified by the "
+                              "user. Try using in-process quoting instead.");
+                OE_RAISE(OE_QUOTE_PROVIDER_CALL_ERROR);
             }
         }
 
