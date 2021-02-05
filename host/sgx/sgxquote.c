@@ -17,8 +17,11 @@
 #include <string.h>
 #include "../../common/oe_host_stdlib.h"
 #include "../../common/sgx/endorsements.h"
+#include "../dupenv.h"
 #include "../hostthread.h"
 #include "sgxquote_ex.h"
+
+static bool defined_sgx_use_in_process_quoting = false;
 
 // Check consistency with OE definition.
 OE_STATIC_ASSERT(sizeof(sgx_target_info_t) == 512);
@@ -100,9 +103,6 @@ static quote3_error_t (*_sgx_qv_verify_quote)(
 
 #define UNLOAD_SGX_DCAP_LIB(module) FreeLibrary((HANDLE)module)
 
-#define SGX_DCAP_IN_PROCESS_QUOTING() \
-    (GetEnvironmentVariableA("SGX_AESM_ADDR", NULL, 0) == 0)
-
 #define TRY_TO_USE_SGX_DCAP_QVL() \
     (GetEnvironmentVariableA("USE_SGX_QVL", NULL, 0) != 0)
 
@@ -122,8 +122,6 @@ static quote3_error_t (*_sgx_qv_verify_quote)(
 #define LOOKUP_FUNCTION(module, fcn) (void*)dlsym(module, fcn)
 
 #define UNLOAD_SGX_DCAP_LIB(module) dlclose(module)
-
-#define SGX_DCAP_IN_PROCESS_QUOTING() (getenv("SGX_AESM_ADDR") == NULL)
 
 #define TRY_TO_USE_SGX_DCAP_QVL() (getenv("USE_SGX_QVL") != NULL)
 
@@ -253,6 +251,47 @@ static bool _load_sgx_dcap_qvl(void)
     return (_qvl_module != NULL);
 }
 
+static bool _sgx_use_in_process_quoting()
+{
+    // Before: the in-process call path is used unless the environment variable
+    // SGX_AESM_ADDR is set. Now: the environment variable SGX_AESM_ADDR is
+    // deprecated. Out-of-process call path will be default on Linux as an SGX
+    // kernel patch upstreaming is scheduled in February or March 2021. Since
+    // the situation is not urgent on Windows, in-process call path will remain
+    // default on Windows.
+    bool result;
+    char* sgx_use_in_process_quoting = oe_dupenv("SGX_USE_IN_PROCESS_QUOTING");
+
+    if (sgx_use_in_process_quoting &&
+        strcmp(sgx_use_in_process_quoting, "0") == 0)
+    {
+        defined_sgx_use_in_process_quoting = true;
+        result = false;
+    }
+    else if (
+        sgx_use_in_process_quoting &&
+        strcmp(sgx_use_in_process_quoting, "1") == 0)
+    {
+        defined_sgx_use_in_process_quoting = true;
+        result = true;
+    }
+    else
+    {
+        // this includes both the case where the environment variable
+        // SGX_USE_IN_PROCESS_QUOTING is undefined and the case where it is set
+        // to a value other than 0 or 1.
+#ifdef _WIN32
+        result = true;
+#else
+        result = false;
+#endif
+    }
+
+    if (sgx_use_in_process_quoting)
+        oe_free(sgx_use_in_process_quoting);
+    return result;
+}
+
 static void _load_quote_ex_library_once(void)
 {
     bool* local_mapped = NULL;
@@ -262,7 +301,7 @@ static void _load_quote_ex_library_once(void)
 
     // First test if DCAP in-process quoting is requested.
     // If not, there is no need to load DCAP without using it.
-    if (SGX_DCAP_IN_PROCESS_QUOTING() && _load_sgx_dcap_ql())
+    if (_sgx_use_in_process_quoting() && _load_sgx_dcap_ql())
     {
         OE_TRACE_INFO("DCAP installed and set for in-process quoting.");
         _quote_ex_library.use_dcap_library_instead = true;
@@ -288,12 +327,24 @@ static void _load_quote_ex_library_once(void)
             _quote_ex_library.sgx_get_supported_att_key_id_num(&att_key_id_num);
         if (status != SGX_SUCCESS || att_key_id_num == 0)
         {
-            OE_TRACE_ERROR(
-                "_load_quote_ex_library_once() "
-                "sgx_get_supported_att_key_id_num() status=%d num=%d\n",
-                status,
-                att_key_id_num);
-            OE_RAISE(OE_QUOTE_PROVIDER_CALL_ERROR);
+            if (defined_sgx_use_in_process_quoting)
+            {
+                // raise the error as the user intends to use quote-ex library,
+                // which turns out to be unavailable
+                OE_TRACE_ERROR(
+                    "_load_quote_ex_library_once() "
+                    "sgx_get_supported_att_key_id_num() status=%d num=%d\n",
+                    status,
+                    att_key_id_num);
+                OE_RAISE(OE_QUOTE_PROVIDER_CALL_ERROR);
+            }
+            else
+            {
+                // try using dcap instead
+                OE_TRACE_INFO("Out-of-process quoting is not specified by the "
+                              "user. Try using in-process quoting instead.");
+                OE_RAISE(OE_QUOTE_PROVIDER_CALL_ERROR);
+            }
         }
 
         local_mapped = (bool*)oe_malloc(att_key_id_num * sizeof(bool));
